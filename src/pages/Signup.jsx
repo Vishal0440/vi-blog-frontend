@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { toast } from "react-hot-toast";
+import { FaEye, FaEyeSlash } from "react-icons/fa";
 import api from "../utils/api";
 import { useNavigate, Link } from "react-router-dom";
 
 export default function Signup() {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
 
   const submit = async (e) => {
@@ -23,71 +25,102 @@ export default function Signup() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-r from-amber-400 to-green-500">
-      <form
-        onSubmit={submit}
-        className="bg-white shadow-xl rounded-2xl p-8 w-[400px]"
-      >
-        <h2 className="text-3xl font-bold text-center mb-6 text-gray-800">
-          Create Account ✨
-        </h2>
+    <div className="h-[calc(100vh-70px)] bg-[#f8f8f8] flex items-center justify-center px-4">
+      <form onSubmit={submit} className="w-full max-w-md">
+        {/* Heading */}
+        <div className="text-center mb-10">
+          <h1
+            className="text-4xl sm:text-5xl font-bold text-[#231f20]"
+            style={{ fontFamily: "Playfair Display, serif" }}
+          >
+            Create your account
+          </h1>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-600 mb-1">
+          <p className="mt-3 text-gray-500">
+            Join <span className="font-semibold text-blue-400">Vi-Blog</span> to
+            start writing.
+          </p>
+        </div>
+
+        {/* Name */}
+        <div className="mb-5">
+          <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">
             Name
           </label>
+
           <input
             type="text"
             required
-            placeholder="Enter your name"
-            className="border border-gray-300 rounded-lg w-full p-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            value={form.name}
+            placeholder="Your name"
             onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className="w-full h-12 px-4 border border-gray-300 rounded-md focus:outline-none focus:border-black"
           />
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-600 mb-1">
+        {/* Email */}
+        <div className="mb-5">
+          <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">
             Email
           </label>
+
           <input
             type="email"
             required
-            placeholder="Enter your email"
-            className="border border-gray-300 rounded-lg w-full p-2 focus:outline-none focus:ring-2 focus:ring-green-500"
+            value={form.email}
+            placeholder="you@email.com"
             onChange={(e) => setForm({ ...form, email: e.target.value })}
+            className="w-full h-12 px-4 border border-gray-300 rounded-md focus:outline-none focus:border-black"
           />
         </div>
 
+        {/* Password */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-600 mb-1">
+          <label className="block text-xs font-bold uppercase tracking-widest text-gray-600 mb-2">
             Password
           </label>
-          <input
-            type="password"
-            required
-            placeholder="Enter your password"
-            className="border border-gray-300 rounded-lg w-full p-2 focus:outline-none focus:ring-2 focus:ring-green-500"
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-          />
+
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              required
+              value={form.password}
+              placeholder="********"
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              className="w-full h-12 px-4 pr-12 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black transition"
+            >
+              {showPassword ? <FaEyeSlash size={18} /> : <FaEye size={18} />}
+            </button>
+          </div>
         </div>
 
+        {/* Button */}
         <button
           type="submit"
           disabled={loading}
-          className={`w-full py-2 text-white font-semibold rounded-lg transition 
-            ${
-              loading
-                ? "bg-green-400 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
-            }`}
+          className={`w-full h-12 rounded-md text-white font-semibold transition ${
+            loading
+              ? "bg-gray-500 cursor-not-allowed"
+              : "bg-[#211d1d] hover:bg-black"
+          }`}
         >
-          {loading ? "Signing up..." : "Signup"}
+          {loading ? "Creating..." : "Create account"}
         </button>
 
-        <p className="text-center text-sm text-gray-600 mt-4 mr-2">
-          Already registered?{" "}
-          <Link to="/login" className="text-green-600 hover:underline">
-            Login
+        {/* Footer */}
+        <p className="text-center mt-8 text-gray-500">
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            className="text-teal-700 font-semibold hover:underline"
+          >
+            Sign in
           </Link>
         </p>
       </form>

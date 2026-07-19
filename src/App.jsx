@@ -17,14 +17,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <Navbar />
-
       <Suspense fallback={<div className="text-center p-5">Loading...</div>}>
         <Routes>
           <Route path="/" element={<Feed />} />
           <Route path="/post/:id" element={<PostView />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-
           <Route
             path="/dashboard"
             element={
@@ -33,7 +31,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/create"
             element={

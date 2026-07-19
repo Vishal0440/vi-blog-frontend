@@ -1,11 +1,17 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../utils/api";
+import PostCards from "./PostCards";
+
+const PAGE_SIZE = 6;
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [author, setAuthor] = useState("all");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     api
@@ -15,70 +21,122 @@ export default function Feed() {
       .finally(() => setLoading(false));
   }, []);
 
+  const authors = useMemo(
+    () => [
+      "all",
+      ...new Set(posts.map((post) => post.author?.name || "Unknown")),
+    ],
+    [posts],
+  );
+
+  const filteredPosts = useMemo(() => {
+    return posts.filter((post) => {
+      const matchesSearch =
+        search === "" ||
+        post.title.toLowerCase().includes(search.toLowerCase()) ||
+        post.body.toLowerCase().includes(search.toLowerCase());
+
+      const matchesAuthor =
+        author === "all" || (post.author?.name || "Unknown") === author;
+
+      return matchesSearch && matchesAuthor;
+    });
+  }, [posts, search, author]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
+
+  const paginatedPosts = filteredPosts.slice(
+    (page - 1) * PAGE_SIZE,
+    page * PAGE_SIZE,
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-gray-500 text-lg">Loading posts...</p>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Latest Posts 📰</h1>
+    <div className="max-w-7xl mx-auto py-6 px-6">
+      {/* Heading + Filter */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+        <div>
+          <h2 className="font-serif text-3xl font-semibold">Latest Posts</h2>
 
-      {posts.length === 0 ? (
-        <div className="bg-white text-center py-12 rounded-lg shadow">
-          <p className="text-gray-600 text-lg">
-            No posts available right now 😕
-          </p>
-          <p className="text-gray-500 text-sm mt-1">Check back later!</p>
+          <div className="w-10 h-1 bg-emerald-700 rounded mt-2"></div>
+        </div>
+
+        <div className="flex gap-3">
+          <input
+            type="text"
+            placeholder="Search posts..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="border border-stone-300 rounded-lg px-4 py-2 w-64 focus:ring-2 focus:ring-emerald-700 outline-none"
+          />
+
+          <select
+            value={author}
+            onChange={(e) => {
+              setAuthor(e.target.value);
+              setPage(1);
+            }}
+            className="border border-stone-300 rounded-lg px-3 py-2 capitalize"
+          >
+            {authors.map((a) => (
+              <option key={a} value={a}>
+                {a === "all" ? "All Authors" : a}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Empty */}
+      {filteredPosts.length === 0 ? (
+        <div className="bg-stone-50 border rounded-lg py-20 text-center">
+          <p className="text-stone-500">No posts found.</p>
         </div>
       ) : (
-        <div className="grid gap-6 md:grid-cols-2">
-          {posts.map((p) => (
-            <div
-              key={p._id}
-              className="bg-white rounded-xl shadow hover:shadow-lg transition overflow-hidden"
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {paginatedPosts.map((post, index) => (
+              <PostCards
+                key={post._id}
+                post={post}
+                index={(page - 1) * PAGE_SIZE + index}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex justify-center gap-2 mt-10">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-4 py-2 border rounded disabled:opacity-40"
             >
-              {p.image && (
-                <img
-                  src={`https://vi-blog-backend.onrender.com${p.image}`}
-                  // src={`http://localhost:5000${p.image}`}
-                  alt="Post"
-                  className="w-full h-60 object-center"
-                />
-              )}
-              <div className="p-5">
-                <h2 className="text-2xl font-semibold text-gray-800">
-                  {p.title}
-                </h2>
-                <div className="flex items-center gap-12 mt-2">
-                  <p className="text-sm text-gray-500 mt-1 capitalize">
-                    By {p.author?.name || "Unknown"}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Posted on :{" "}
-                    {new Date(p.createdAt).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </p>
-                </div>
-                <p className="mt-3 text-gray-700 leading-relaxed">
-                  {p.body?.slice(0, 200)}...
-                </p>
-                <Link
-                  to={`/post/${p._id}`}
-                  className="inline-block mt-4 text-blue-600 hover:underline font-medium"
-                >
-                  View more →
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
+              Prev
+            </button>
+
+            <span className="px-4 py-2">
+              {page} / {totalPages}
+            </span>
+
+            <button
+              disabled={page === totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-4 py-2 border rounded disabled:opacity-40"
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

@@ -1,39 +1,61 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, Trash2, ArrowRight, FileText } from "lucide-react";
+import { Plus, Trash2, ArrowRight, FileText, AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
-import api from "../utils/api";
+import api, { getImageUrl } from "../utils/api";
+
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
 
   const token = localStorage.getItem("token");
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const user = getStoredUser();
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
-    if (!token || !user._id) {
+    if (!token || !user?._id) {
       navigate("/login");
       return;
     }
 
+    setLoading(true);
+    setError(false);
+
     api
       .get("/posts", {
+        params: { author: user._id },
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
       .then((res) => {
+        // Filter defensively in case the backend ignores the query param
+        // and still returns every post.
         setPosts(res.data.filter((p) => p.author?._id === user._id));
       })
-      .catch(() => toast.error("Failed to load posts"))
+      .catch(() => {
+        setError(true);
+        toast.error("Failed to load posts");
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [token, user?._id, navigate]);
 
   const deletePost = async (id) => {
     if (!window.confirm("Delete this post?")) return;
+
+    setDeletingId(id);
 
     try {
       await api.delete(`/posts/${id}`, {
@@ -46,8 +68,13 @@ export default function Dashboard() {
       toast.success("Post deleted");
     } catch {
       toast.error("Failed to delete post");
+    } finally {
+      setDeletingId(null);
     }
   };
+
+  const truncate = (text, max) =>
+    text.length > max ? `${text.slice(0, max)}...` : text;
 
   if (loading) {
     return (
@@ -89,7 +116,38 @@ export default function Dashboard() {
         <div className="w-10 h-1 bg-emerald-700 mt-2 rounded"></div>
       </div>
 
-      {posts.length === 0 ? (
+      {error ? (
+        <div className="border border-red-200 bg-red-50 rounded-lg py-20 flex flex-col items-center">
+          <AlertCircle size={40} className="text-red-400 mb-3" />
+
+          <p className="text-red-600 mb-5">
+            Something went wrong loading your posts.
+          </p>
+
+          <button
+            onClick={() => {
+              setLoading(true);
+              setError(false);
+              api
+                .get("/posts", {
+                  params: { author: user._id },
+                  headers: { Authorization: `Bearer ${token}` },
+                })
+                .then((res) => {
+                  setPosts(res.data.filter((p) => p.author?._id === user._id));
+                })
+                .catch(() => {
+                  setError(true);
+                  toast.error("Failed to load posts");
+                })
+                .finally(() => setLoading(false));
+            }}
+            className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded cursor-pointer"
+          >
+            Try again
+          </button>
+        </div>
+      ) : posts.length === 0 ? (
         <div className="border border-stone-300 bg-stone-50 rounded-lg py-20 flex flex-col items-center">
           <FileText size={40} className="text-stone-400 mb-3" />
 
@@ -112,7 +170,7 @@ export default function Dashboard() {
               {post.image && (
                 <div className="h-52 overflow-hidden">
                   <img
-                    src={`https://vi-blog-backend.onrender.com${post.image}`}
+                    src={getImageUrl(post.image)}
                     alt={post.title}
                     className="w-full h-full object-cover"
                   />
@@ -133,7 +191,7 @@ export default function Dashboard() {
                 </p>
 
                 <p className="text-sm text-stone-600 leading-relaxed">
-                  {post.body.slice(0, 140)}...
+                  {truncate(post.body, 140)}
                 </p>
 
                 <div className="flex justify-between items-center mt-6 border-t border-stone-200 pt-4">
@@ -147,10 +205,11 @@ export default function Dashboard() {
 
                   <button
                     onClick={() => deletePost(post._id)}
-                    className="flex items-center gap-2 text-red-500 hover:text-red-600 cursor-pointer"
+                    disabled={deletingId === post._id}
+                    className="flex items-center gap-2 text-red-500 hover:text-red-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 size={16} />
-                    Delete
+                    {deletingId === post._id ? "Deleting..." : "Delete"}
                   </button>
                 </div>
               </div>

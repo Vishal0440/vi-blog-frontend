@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../utils/api";
 import PostCards from "./PostCards";
@@ -9,25 +9,38 @@ const PAGE_SIZE = 6;
 export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [author, setAuthor] = useState("all");
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
+  const loadPosts = () => {
+    setLoading(true);
+    setError(false);
+
     api
       .get("/posts")
       .then((res) => setPosts(res.data))
-      .catch(() => toast.error("Failed to load posts"))
+      .catch(() => {
+        setError(true);
+        toast.error("Failed to load posts");
+      })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadPosts();
   }, []);
 
-  const authors = useMemo(
-    () => [
-      "all",
-      ...new Set(posts.map((post) => post.author?.name || "Unknown")),
-    ],
-    [posts],
-  );
+  const authors = useMemo(() => {
+    const seen = new Map(); // lowercase name -> display name, so "John" and "john" collapse to one entry
+    posts.forEach((post) => {
+      const name = post.author?.name || "Unknown";
+      const key = name.toLowerCase();
+      if (!seen.has(key)) seen.set(key, name);
+    });
+    return ["all", ...seen.values()];
+  }, [posts]);
 
   const filteredPosts = useMemo(() => {
     return posts.filter((post) => {
@@ -44,6 +57,12 @@ export default function Feed() {
   }, [posts, search, author]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPosts.length / PAGE_SIZE));
+
+  // If a filter narrows the results below the current page, snap back to
+  // the last valid page instead of showing an empty grid with "3 / 1".
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [totalPages, page]);
 
   const paginatedPosts = filteredPosts.slice(
     (page - 1) * PAGE_SIZE,
@@ -97,8 +116,23 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* Empty */}
-      {filteredPosts.length === 0 ? (
+      {/* Error */}
+      {error ? (
+        <div className="bg-red-50 border border-red-200 rounded-lg py-20 flex flex-col items-center">
+          <AlertCircle size={40} className="text-red-400 mb-3" />
+
+          <p className="text-red-600 mb-5">
+            Something went wrong loading posts.
+          </p>
+
+          <button
+            onClick={loadPosts}
+            className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded cursor-pointer"
+          >
+            Try again
+          </button>
+        </div>
+      ) : filteredPosts.length === 0 ? (
         <div className="bg-stone-50 border rounded-lg py-20 text-center">
           <p className="text-stone-500">No posts found.</p>
         </div>

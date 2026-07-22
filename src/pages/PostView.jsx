@@ -1,25 +1,50 @@
 import React, { useEffect, useState } from "react";
-import api from "../utils/api";
+import api, { getImageUrl } from "../utils/api";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Heart, MessageCircle, Share2, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, Heart, Share2, User } from "lucide-react";
+import { toast } from "react-hot-toast";
+
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem("user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function PostView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
+  const [error, setError] = useState(false);
   const [liked, setLiked] = useState(false);
 
   const token = localStorage.getItem("token");
+  const user = getStoredUser();
 
   useEffect(() => {
+    setPost(null);
+    setError(false);
+
     api
       .get(`/posts/${id}`)
-      .then((res) => setPost(res.data))
-      .catch(console.error);
+      .then((res) => {
+        setPost(res.data);
+        setLiked(Boolean(user?._id && res.data.likes?.includes(user._id)));
+      })
+      .catch((err) => {
+        console.error(err);
+        setError(true);
+      });
   }, [id]);
 
   const toggleLike = async () => {
-    if (!token) return alert("Please login first");
+    if (!token) return toast.error("Please login first");
+
+    // Optimistic update so the button feels instant.
+    const wasLiked = liked;
+    setLiked(!wasLiked);
 
     try {
       await api.post(
@@ -34,11 +59,33 @@ export default function PostView() {
 
       const res = await api.get(`/posts/${id}`);
       setPost(res.data);
-      setLiked(!liked);
+      setLiked(Boolean(user?._id && res.data.likes?.includes(user._id)));
     } catch (err) {
-      console.log(err);
+      console.error(err);
+      setLiked(wasLiked); // roll back on failure
+      toast.error("Failed to update like");
     }
   };
+
+  if (error) {
+    return (
+      <div className="max-w-3xl mx-auto py-20 px-5 flex flex-col items-center text-center">
+        <AlertCircle size={40} className="text-red-400 mb-3" />
+
+        <p className="text-stone-600 mb-5">
+          This post couldn't be found or failed to load.
+        </p>
+
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded cursor-pointer"
+        >
+          <ArrowLeft size={16} />
+          Back to Feed
+        </button>
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -84,10 +131,9 @@ export default function PostView() {
       {post.image && (
         <div className="rounded-xl overflow-hidden mb-4">
           <img
-            src={`https://vi-blog-backend.onrender.com${post.image}`}
-            // src={`http://localhost:5000${post.image}`}
+            src={getImageUrl(post.image)}
             alt={post.title}
-            className="w-full h-[300px] object-fill"
+            className="w-full h-[300px] object-cover"
           />
         </div>
       )}

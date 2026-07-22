@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Heart, MessageCircle, ArrowRight, User } from "lucide-react";
+import { getImageUrl } from "../utils/api";
 
 const PostCards = ({ post, index }) => {
   return (
@@ -17,10 +18,9 @@ const PostCards = ({ post, index }) => {
       {post.image && (
         <div className="h-50 overflow-hidden flex-shrink-0">
           <img
-            src={`https://vi-blog-backend.onrender.com${post.image}`}
-            // src={`http://localhost:5000${post.image}`}
+            src={getImageUrl(post.image)}
             alt={post.title}
-            className="w-full h-full object-fill transition-transform duration-500 hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
           />
         </div>
       )}

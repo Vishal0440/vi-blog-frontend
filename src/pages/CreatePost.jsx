@@ -1,8 +1,10 @@
-import React, { useState } from "react";
-import { ArrowLeft, Upload } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { ArrowLeft, Upload, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../utils/api";
 import { useNavigate } from "react-router-dom";
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export default function CreatePost() {
   const navigate = useNavigate();
@@ -14,28 +16,77 @@ export default function CreatePost() {
     image: null,
   });
 
+  const [imagePreview, setImagePreview] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Guard: redirect unauthenticated users instead of letting the POST fail with a 401.
+  useEffect(() => {
+    if (!token) {
+      toast.error("Please log in to create a post");
+      navigate("/login");
+    }
+  }, [token, navigate]);
+
+  // Clean up the object URL used for the preview when it changes/unmounts.
+  useEffect(() => {
+    return () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
 
   const wordCount =
     form.body.trim() === "" ? 0 : form.body.trim().split(/\s+/).length;
 
   const handleFile = (e) => {
+    const file = e.target.files[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast.error("Image must be 5MB or smaller");
+      e.target.value = "";
+      return;
+    }
+
     setForm({
       ...form,
-      image: e.target.files[0],
+      image: file,
     });
+
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(URL.createObjectURL(file));
+
+    // Allow re-selecting the same file later and still trigger onChange.
+    e.target.value = "";
+  };
+
+  const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImagePreview(null);
+    setForm({ ...form, image: null });
   };
 
   const submit = async (e) => {
     e.preventDefault();
+
+    if (!form.title.trim() || !form.body.trim()) {
+      toast.error("Title and story can't be empty");
+      return;
+    }
 
     setLoading(true);
 
     try {
       const fd = new FormData();
 
-      fd.append("title", form.title);
-      fd.append("body", form.body);
+      fd.append("title", form.title.trim());
+      fd.append("body", form.body.trim());
 
       if (form.image) {
         fd.append("image", form.image);
@@ -52,11 +103,17 @@ export default function CreatePost() {
 
       navigate("/dashboard");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed");
+      if (!err.response) {
+        toast.error("Network error — please check your connection");
+      } else {
+        toast.error(err.response?.data?.message || "Failed");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  if (!token) return null;
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-5 ">
@@ -89,11 +146,15 @@ export default function CreatePost() {
 
         {/* Title */}
 
-        <label className="block text-xs uppercase tracking-wider font-mono text-stone-500 mb-1">
+        <label
+          htmlFor="post-title"
+          className="block text-xs uppercase tracking-wider font-mono text-stone-500 mb-1"
+        >
           Title
         </label>
 
         <input
+          id="post-title"
           required
           maxLength={100}
           value={form.title}
@@ -117,31 +178,52 @@ export default function CreatePost() {
           Cover Image
         </label>
 
-        <label className="border-2 border-dashed border-stone-300 rounded-lg py-10 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-700 hover:text-emerald-700 transition mb-6">
-          <Upload size={26} />
+        {imagePreview ? (
+          <div className="relative mb-6 rounded-lg overflow-hidden border border-stone-300">
+            <img
+              src={imagePreview}
+              alt="Cover preview"
+              className="w-full max-h-64 object-cover"
+            />
 
-          <p className="mt-2 text-sm">
-            {form.image ? form.image.name : "Click to upload image"}
-          </p>
+            <button
+              type="button"
+              onClick={removeImage}
+              className="absolute top-2 right-2 bg-stone-900/70 hover:bg-stone-900 text-white rounded-full p-1.5 cursor-pointer"
+              aria-label="Remove image"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          <label className="border-2 border-dashed border-stone-300 rounded-lg py-10 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-700 hover:text-emerald-700 transition mb-6">
+            <Upload size={26} />
 
-          <p className="text-xs text-stone-400">PNG, JPG up to 5MB</p>
+            <p className="mt-2 text-sm">Click to upload image</p>
 
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFile}
-            className="hidden"
-          />
-        </label>
+            <p className="text-xs text-stone-400">PNG, JPG up to 5MB</p>
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFile}
+              className="hidden"
+            />
+          </label>
+        )}
 
         {/* Body */}
 
-        <label className="block text-xs uppercase tracking-wider font-mono text-stone-500 mb-2">
+        <label
+          htmlFor="post-body"
+          className="block text-xs uppercase tracking-wider font-mono text-stone-500 mb-2"
+        >
           Story
         </label>
 
         <div className="border border-stone-300 rounded-lg overflow-hidden">
           <textarea
+            id="post-body"
             required
             rows={12}
             value={form.body}

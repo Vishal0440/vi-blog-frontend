@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import React, { useState } from "react";
+import { ArrowLeft, ImageIcon } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../utils/api";
 import { useNavigate } from "react-router-dom";
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export default function CreatePost() {
   const navigate = useNavigate();
@@ -13,64 +11,14 @@ export default function CreatePost() {
   const [form, setForm] = useState({
     title: "",
     body: "",
-    image: null,
+    image: "",
   });
 
-  const [imagePreview, setImagePreview] = useState(null);
+  const [imageError, setImageError] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Guard: redirect unauthenticated users instead of letting the POST fail with a 401.
-  useEffect(() => {
-    if (!token) {
-      toast.error("Please log in to create a post");
-      navigate("/login");
-    }
-  }, [token, navigate]);
-
-  // Clean up the object URL used for the preview when it changes/unmounts.
-  useEffect(() => {
-    return () => {
-      if (imagePreview) URL.revokeObjectURL(imagePreview);
-    };
-  }, [imagePreview]);
 
   const wordCount =
     form.body.trim() === "" ? 0 : form.body.trim().split(/\s+/).length;
-
-  const handleFile = (e) => {
-    const file = e.target.files[0];
-
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
-      e.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_IMAGE_SIZE) {
-      toast.error("Image must be 5MB or smaller");
-      e.target.value = "";
-      return;
-    }
-
-    setForm({
-      ...form,
-      image: file,
-    });
-
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImagePreview(URL.createObjectURL(file));
-
-    // Allow re-selecting the same file later and still trigger onChange.
-    e.target.value = "";
-  };
-
-  const removeImage = () => {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImagePreview(null);
-    setForm({ ...form, image: null });
-  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -83,21 +31,19 @@ export default function CreatePost() {
     setLoading(true);
 
     try {
-      const fd = new FormData();
-
-      fd.append("title", form.title.trim());
-      fd.append("body", form.body.trim());
-
-      if (form.image) {
-        fd.append("image", form.image);
-      }
-
-      await api.post("/posts", fd, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
+      await api.post(
+        "/posts",
+        {
+          title: form.title.trim(),
+          body: form.body.trim(),
+          image: form.image.trim() || undefined,
         },
-      });
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
       toast.success("Post published 🎉");
 
@@ -112,8 +58,6 @@ export default function CreatePost() {
       setLoading(false);
     }
   };
-
-  if (!token) return null;
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-5 ">
@@ -172,45 +116,50 @@ export default function CreatePost() {
           {form.title.length}/100
         </p>
 
-        {/* Upload */}
+        {/* Image URL */}
 
-        <label className="block text-xs uppercase tracking-wider font-mono text-stone-500 mb-2">
-          Cover Image
+        <label
+          htmlFor="post-image"
+          className="block text-xs uppercase tracking-wider font-mono text-stone-500 mb-2"
+        >
+          Cover Image URL
         </label>
 
-        {imagePreview ? (
-          <div className="relative mb-6 rounded-lg overflow-hidden border border-stone-300">
+        <div className="flex items-center gap-2 border border-stone-300 rounded px-3 py-2 mb-2 focus-within:ring-2 focus-within:ring-emerald-700">
+          <ImageIcon size={16} className="text-stone-400 flex-shrink-0" />
+
+          <input
+            id="post-image"
+            type="url"
+            value={form.image}
+            onChange={(e) => {
+              setForm({ ...form, image: e.target.value });
+              setImageError(false);
+            }}
+            placeholder="https://example.com/image.jpg (optional)"
+            className="w-full focus:outline-none text-sm"
+          />
+        </div>
+
+        {form.image && !imageError && (
+          <div className="rounded-lg overflow-hidden border border-stone-300 mb-6 h-52">
             <img
-              src={imagePreview}
+              src={form.image}
               alt="Cover preview"
-              className="w-full max-h-64 object-cover"
+              onError={() => setImageError(true)}
+              className="w-full h-full object-cover"
             />
-
-            <button
-              type="button"
-              onClick={removeImage}
-              className="absolute top-2 right-2 bg-stone-900/70 hover:bg-stone-900 text-white rounded-full p-1.5 cursor-pointer"
-              aria-label="Remove image"
-            >
-              <X size={16} />
-            </button>
           </div>
-        ) : (
-          <label className="border-2 border-dashed border-stone-300 rounded-lg py-10 flex flex-col items-center justify-center cursor-pointer hover:border-emerald-700 hover:text-emerald-700 transition mb-6">
-            <Upload size={26} />
-
-            <p className="mt-2 text-sm">Click to upload image</p>
-
-            <p className="text-xs text-stone-400">PNG, JPG up to 5MB</p>
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFile}
-              className="hidden"
-            />
-          </label>
         )}
+
+        {imageError && (
+          <p className="text-xs text-red-500 mb-6">
+            That image URL couldn't be loaded — check the link or try another
+            one.
+          </p>
+        )}
+
+        {!form.image && <div className="mb-4" />}
 
         {/* Body */}
 

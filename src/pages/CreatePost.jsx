@@ -28,6 +28,13 @@ export default function CreatePost() {
       return;
     }
 
+    if (form.image.trim() && imageError) {
+      toast.error(
+        "That image URL doesn't work — fix or remove it before publishing",
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
